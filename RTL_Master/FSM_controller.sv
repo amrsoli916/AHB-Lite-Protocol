@@ -40,7 +40,7 @@ localparam logic [1:0] HTRANS_NONSEQ = 2'b10;
 localparam logic [1:0] HTRANS_SEQ    = 2'b11;
 
 
-typedef enum logic [2:0] 
+typedef enum logic [1:0] 
 { 
     IDLE,
     LOAD,
@@ -154,8 +154,12 @@ always_comb begin
             ////////////////////////////////////////////////////////////////////////////////////////////////////
             //HERE can Handle BUSY state if we add a fifo when it empty or full control this if it read or write 
             ////////////////////////////////////////////////////////////////////////////////////////////////////
+            //if donot handle can master transimite data wider than it's width put signal size_error
+            //when it high go to idle state 
+            ////////////////////////////////////////////////////////////////////////////////////////////////////
+        end 
 
-        end            
+        default: HTRANS = HTRANS_IDLE;           
     endcase
 end
 
