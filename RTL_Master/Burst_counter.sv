@@ -1,6 +1,6 @@
 module Burst_counter(
     input logic HCLK,
-    input logic HRST_n,
+    input logic HRESET_n,
 
     //control
     input logic Decrement_counter,
@@ -11,7 +11,6 @@ module Burst_counter(
     input logic End_Incr_Burst,
 
     //output 
-    output logic FirstBeat,
     output logic TransferDone
 );
 
@@ -47,21 +46,18 @@ end
 //Counter + First beat
 /////////////////////////////////////////////
 
-always_ff @(posedge HCLK or negedge HRST_n ) begin : blockName
-    if(!HRST_n) begin
-        FirstBeat <= 0;
+always_ff @(posedge HCLK or negedge HRESET_n ) begin : blockName
+    if(!HRESET_n) begin
         beat_counter <= 0;
     end
     else begin
         if (Load_Counter) begin
             beat_counter <= burst_length;
-            FirstBeat <= 1;
         end
         else if (Decrement_counter) begin
             if (beat_counter != 0) begin
                 beat_counter <= beat_counter -1;
             end
-            FirstBeat <= 0;
         end
     end
 end
