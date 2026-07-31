@@ -129,13 +129,6 @@ always_comb begin
             Load_Start_Address = 1'b1;
 
             HTRANS = HTRANS_NONSEQ;
-
-            if (HWRITE) begin
-                Write_enable = 1'b1;
-            end
-            else begin
-                Read_enable = 1'b1;
-            end
         end 
 
         ///////////////////////////////
@@ -148,6 +141,13 @@ always_comb begin
             if (HREADY && !TransferDone) begin
                 Decrement_counter = 1'b1;
                 Increment_Address = 1'b1;
+
+                if (HWRITE) begin                  //i need put fifo we edit this signal to control fifo design in read and write 
+                    Write_enable = 1'b1;           
+                end
+                else begin
+                    Read_enable = 1'b1;
+                end                
             end
 
 
