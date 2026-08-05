@@ -1,11 +1,11 @@
 module Address_Generator (
-    input logic [31:0] start_address,
-    input logic [31:0] current_address,
+    input logic [31:0] Start_Address,
+    input logic [31:0] Current_Address,
 
     input logic [2:0] HSIZE,
     input logic [2:0] HBURST,
 
-    output logic [31:0] next_address
+    output logic [31:0] Next_Address
 );
 
 logic [31:0] increment;
@@ -56,7 +56,7 @@ end
 
 always_comb begin
 
-    next_address = current_address;
+    Next_Address = Current_Address;
 
     case(HBURST)
 
@@ -66,7 +66,7 @@ always_comb begin
         INCR8,
         INCR16:
         begin
-            next_address = next_linear_address;
+            Next_Address = next_linear_address;
         end
 
         WRAP4,
@@ -74,21 +74,21 @@ always_comb begin
         WRAP16:
         begin
             if(next_linear_address >= (wrap_boundary + boundary_size))
-                next_address = wrap_boundary;
+                Next_Address = wrap_boundary;
 
             else
-                next_address = next_linear_address;
+                Next_Address = next_linear_address;
         end
 
         default:
-            next_address = current_address;
+            Next_Address = Current_Address;
 
     endcase
 
 end
 
 assign boundary_size = burst_length * increment;
-assign wrap_boundary = start_address & ~(boundary_size - 1);
-assign next_linear_address = current_address + increment;
+assign wrap_boundary = Start_Address & ~(boundary_size - 1);
+assign next_linear_address = Current_Address + increment;
     
 endmodule

@@ -4,10 +4,11 @@ module FSM (
 
     //AHB
     input logic Request,
-    input logic HWRITE,
+    input logic Busy,
 
     //Burst Control
     input logic TransferDone,
+    input logic Last_Beat,
 
     //From Slave
     input logic HREADY,
@@ -26,9 +27,9 @@ module FSM (
     output logic Load_Start_Address,
     output logic Increment_Address,
 
-    //To write read enable 
-    output logic Write_enable,
-    output logic Read_enable,
+    //To write enable & register enable 
+    output logic Capture_Control_Signal,
+    output logic Data_Phase_Active,
 
     //output from master and control for slave 
     output logic [1:0] HTRANS
@@ -44,7 +45,8 @@ typedef enum logic [1:0]
 { 
     IDLE,
     LOAD,
-    TRANSFER
+    TRANSFER,
+    BUSY
 } state_t;
 
 state_t current_state, next_state;
@@ -61,42 +63,69 @@ end
 
 //select next state depend on currnt state 
 always_comb begin 
-
+    // Default assignment to prevent latches
     next_state = current_state;
 
     case (current_state)
-        //if we in IDLE state 
-       IDLE : begin
-        if (Request) begin
-            next_state = LOAD;          //Request come
+        // If we are in IDLE state 
+        IDLE : begin
+            if (Request) begin
+                next_state = LOAD;          // Request came
+            end
+            else begin
+                next_state = IDLE;          // No Request
+            end
         end
-        else begin
-            next_state = IDLE;          //Not Request come
-        end
-       end
 
-        //If we in LOAD state 
+        // If we are in LOAD state 
         LOAD : begin
-            next_state = TRANSFER;      //next state is Transfer 
-        end
-
-        //If we in Transfer state 
-        TRANSFER : begin
             if (TimeOut || HRESP) begin
                 next_state = IDLE;
             end
-            else if (TransferDone && HREADY) begin
-                if (Request) begin
-                    next_state = LOAD;
-                end
-                else begin
-                    next_state = IDLE;
-                end
+            else if (HREADY) begin
+                next_state = TRANSFER;      // Slave accepted the first address
             end
             else begin
-                next_state = TRANSFER;
+                next_state = LOAD;
             end
         end
+
+        // If we are in TRANSFER state 
+        TRANSFER : begin
+            if (TimeOut || HRESP) begin
+                next_state = IDLE;          // Error priority
+            end
+            else if (TransferDone) begin    // TransferDone implies (Last_Beat && HREADY)
+                // We are at the END of the burst
+                if (Request) begin
+                    next_state = TRANSFER;  // Back-to-back Burst
+                end
+                else begin
+                    next_state = IDLE;      // Burst finished, bus is free
+                end
+            end
+            // We are in the MIDDLE of a burst, check if CPU needs to pause
+            else if (HREADY && Busy) begin 
+                next_state = BUSY;          // Inject Wait States from Master side
+            end
+            else begin
+                next_state = TRANSFER;      // Continue normally OR wait for slave (HREADY=0)
+            end
+        end
+
+        // If we are in BUSY state
+        BUSY : begin
+            if (TimeOut || HRESP) begin
+                next_state = IDLE;          // Error priority
+            end
+            else if (HREADY && !Busy) begin
+                next_state = TRANSFER;      // Slave accepted the transfer, go back to TRANSFER state
+            end
+            else begin
+                next_state = BUSY;          // Continue to wait for slave (HREADY=0)
+            end
+        end
+        
         default: next_state = IDLE;
     endcase
 end
@@ -108,8 +137,6 @@ always_comb begin
     Load_Counter       = 1'b0;
     Load_Start_Address = 1'b0; 
     Increment_Address  = 1'b0;
-    Write_enable       = 1'b0;
-    Read_enable        = 1'b0;
     HTRANS             = HTRANS_IDLE;
 
     case (current_state) 
@@ -136,31 +163,56 @@ always_comb begin
         //////////////////////////////  
         TRANSFER : begin
 
-            HTRANS = HTRANS_SEQ;
-
-            if (HREADY && !TransferDone) begin
-                Decrement_counter = 1'b1;
-                Increment_Address = 1'b1;
-
-                if (HWRITE) begin                  //i need put fifo we edit this signal to control fifo design in read and write 
-                    Write_enable = 1'b1;           
+            if(Last_Beat)begin
+                if(Request)begin
+                    HTRANS = HTRANS_NONSEQ;  // Back-to-back Burst
                 end
                 else begin
-                    Read_enable = 1'b1;
-                end                
+                    HTRANS = HTRANS_IDLE;     // Burst finished, bus is free
+                end
             end
-
-
-            ////////////////////////////////////////////////////////////////////////////////////////////////////
-            //HERE can Handle BUSY state if we add a fifo when it empty or full control this if it read or write 
-            ////////////////////////////////////////////////////////////////////////////////////////////////////
-            //if donot handle can master transimite data wider than it's width put signal size_error
-            //when it high go to idle state 
-            ////////////////////////////////////////////////////////////////////////////////////////////////////
+            else begin
+                HTRANS = HTRANS_SEQ;          // Continue normally OR wait for slave (HREADY=0)
+            end
+            
+            if(HREADY)begin
+                Decrement_counter = 1'b1;
+                if(Last_Beat)begin
+                    if(Request)begin
+                        Load_Counter       = 1'b1;          // Back-to-back Burst
+                        Load_Start_Address = 1'b1;          // Load new start address
+                    end
+                end
+                else begin
+                    Increment_Address = 1'b1;
+                end
+            end
         end 
+
+        ///////////////////////////////
+        //BUSY_STATE
+        //////////////////////////////
+        BUSY : begin
+            HTRANS = HTRANS_BUSY;
+        end
 
         default: HTRANS = HTRANS_IDLE;           
     endcase
+end
+
+//signal to enable the registeer to capture the state of HWRITE during the data phase. 
+//This is used to determine if the current transfer is a read or write operation.
+assign Capture_Control_Signal = HREADY && Load_Start_Address;
+
+always_ff @(posedge HCLK or negedge HRESET_n) begin
+    if (!HRESET_n)
+        Data_Phase_Active <= 1'b0;
+    else if (HREADY) begin
+        if (HTRANS == 2'b10 || HTRANS == 2'b11)                      // NONSEQ or SEQ
+            Data_Phase_Active <= 1'b1;                              //  Data Phase
+        else if (HTRANS == 2'b00 || HTRANS == 2'b01)               // IDLE & Busy
+            Data_Phase_Active <= 1'b0;        
+    end
 end
 
     

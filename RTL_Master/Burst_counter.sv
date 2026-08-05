@@ -8,10 +8,14 @@ module Burst_counter(
 
     //AHB
     input logic [2:0] HBURST,
-    input logic End_Incr_Burst,
+    input logic Last_Transfer,
+
+    //Slave
+    input logic HREADY,
 
     //output 
-    output logic TransferDone
+    output logic TransferDone,
+    output logic Last_Beat
 );
 
 localparam logic [2:0] SINGLE = 3'b000;
@@ -66,6 +70,8 @@ end
 //TransferDone
 ///////////////////////////////////////////////
 
-assign TransferDone = (HBURST == INCR)? End_Incr_Burst : ((beat_counter == 5'd1) && Decrement_counter);
+assign Last_Beat = (HBURST == INCR) ? Last_Transfer : (beat_counter == 5'd1);
+
+assign TransferDone = Last_Beat & HREADY;
 
 endmodule
