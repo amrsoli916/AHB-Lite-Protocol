@@ -14,8 +14,7 @@ module Burst_counter(
     input logic HREADY,
 
     //output 
-    output logic TransferDone,
-    output logic Last_Beat
+    output logic TransferDone
 );
 
 localparam logic [2:0] SINGLE = 3'b000;
@@ -29,6 +28,7 @@ localparam logic [2:0] INCR16 = 3'b111;
 
 logic [4:0] beat_counter;
 logic [4:0] burst_length;
+logic Last_Beat;
 
 //////////////////////////////////////////////
 //Decode Burst Lenght

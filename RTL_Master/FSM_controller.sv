@@ -8,7 +8,6 @@ module FSM (
 
     //Burst Control
     input logic TransferDone,
-    input logic Last_Beat,
 
     //From Slave
     input logic HREADY,
@@ -32,7 +31,8 @@ module FSM (
     output logic Data_Phase_Active,
 
     //output from master and control for slave 
-    output logic [1:0] HTRANS
+    output logic [1:0] HTRANS,
+    output logic CPU_Command_Ready
 );
 
 localparam logic [1:0] HTRANS_IDLE   = 2'b00;
@@ -163,7 +163,7 @@ always_comb begin
         //////////////////////////////  
         TRANSFER : begin
 
-            if(Last_Beat)begin
+            if(TransferDone)begin
                 if(Request)begin
                     HTRANS = HTRANS_NONSEQ;  // Back-to-back Burst
                 end
@@ -177,7 +177,7 @@ always_comb begin
             
             if(HREADY)begin
                 Decrement_counter = 1'b1;
-                if(Last_Beat)begin
+                if(TransferDone)begin
                     if(Request)begin
                         Load_Counter       = 1'b1;          // Back-to-back Burst
                         Load_Start_Address = 1'b1;          // Load new start address
@@ -214,6 +214,8 @@ always_ff @(posedge HCLK or negedge HRESET_n) begin
             Data_Phase_Active <= 1'b0;        
     end
 end
+
+assign CPU_Command_Ready = TransferDone || (current_state == IDLE);
 
     
 endmodule

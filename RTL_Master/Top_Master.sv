@@ -41,14 +41,13 @@ module Top_Master #(width = 32)(
 );
     
 logic Load_Counter, Decrement_counter;
-logic TransferDone, Last_Beat;
+logic TransferDone;
 logic Load_Start_Address, Increment_Address;
 logic Capture_Control_Signal;
 logic TimeOut;
 logic HWRITE_Data_Phase, Write_Enable;
 logic [31:0] Current_Address, Next_Address;
 logic [2:0] HSIZE_Data_Phase, HBURST_Data_Phase;
-logic Data_Phase_Active;
 
 //Burst Counter
 Burst_counter Burst_Counter_Inst(
@@ -59,7 +58,6 @@ Burst_counter Burst_Counter_Inst(
     .HBURST(CPU_HBURST),
     .HREADY(HREADY),
     .TransferDone(TransferDone),
-    .Last_Beat(Last_Beat),
     .Last_Transfer(CPU_Last_Transfer)
 );
 
@@ -94,7 +92,6 @@ FSM FSM_Inst(
     .Request(CPU_Request),
     .Busy(CPU_Busy),
     .TransferDone(TransferDone),
-    .Last_Beat(Last_Beat),
     .HREADY(HREADY),
     .HRESP(HRESP),
     .TimeOut(TimeOut),
@@ -104,7 +101,8 @@ FSM FSM_Inst(
     .Increment_Address(Increment_Address),
     .Capture_Control_Signal(Capture_Control_Signal),
     .HTRANS(HTRANS),
-    .Data_Phase_Active(Data_Phase_Active)
+    .Data_Phase_Active(Data_Phase_Active),
+    .CPU_Command_Ready(CPU_Command_Ready)              // to tell the CPU i'm Ready to have a new Request
 );
 
 //Next Address Generator
@@ -129,8 +127,6 @@ assign HADDR = (Load_Start_Address) ? CPU_HADDR : Next_Address;       //assign t
 assign HSIZE  = (Load_Start_Address) ? CPU_HSIZE  : HSIZE_Data_Phase;    //assign the CPU size signal to the HSIZE output
 assign HBURST = (Load_Start_Address) ? CPU_HBURST : HBURST_Data_Phase;   //assign the CPU burst signal to the
 
-//enable signal to the CPU the AHB is ready to start the new Burst transfer
-assign CPU_Command_Ready = Last_Beat;      //assign the last beat signal to the next burst request enable output
 
 //enable signal to tell CPU occure error during the transfer
 assign CPU_Error = HRESP && HREADY;                 //assign the HRESP and HREADY signals to the CPU error output
