@@ -14,7 +14,8 @@ module Burst_counter(
     input logic HREADY,
 
     //output 
-    output logic TransferDone
+    output logic TransferDone,
+    output logic First_Beat
 );
 
 localparam logic [2:0] SINGLE = 3'b000;
@@ -74,4 +75,5 @@ assign Last_Beat = (HBURST == INCR) ? Last_Transfer : (beat_counter == 5'd1);
 
 assign TransferDone = Last_Beat & HREADY;
 
+assign First_Beat = (burst_length == beat_counter);
 endmodule

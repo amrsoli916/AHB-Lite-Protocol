@@ -8,6 +8,7 @@ module FSM (
 
     //Burst Control
     input logic TransferDone,
+    input logic First_Beat,
 
     //From Slave
     input logic HREADY,
@@ -16,7 +17,6 @@ module FSM (
     //TimeOut
     input logic TimeOut,
 
-    //Output
 
     //To Burst Counter
     output logic Decrement_counter,
@@ -27,8 +27,7 @@ module FSM (
     output logic Increment_Address,
 
     //To write enable & register enable 
-    output logic Capture_Control_Signal,
-    output logic Data_Phase_Active,
+    output logic Address_Accepted,
 
     //output from master and control for slave 
     output logic [1:0] HTRANS,
@@ -44,7 +43,6 @@ localparam logic [1:0] HTRANS_SEQ    = 2'b11;
 typedef enum logic [1:0] 
 { 
     IDLE,
-    LOAD,
     TRANSFER,
     BUSY
 } state_t;
@@ -70,25 +68,13 @@ always_comb begin
         // If we are in IDLE state 
         IDLE : begin
             if (Request) begin
-                next_state = LOAD;          // Request came
+                next_state = TRANSFER;          // Request came
             end
             else begin
                 next_state = IDLE;          // No Request
             end
         end
 
-        // If we are in LOAD state 
-        LOAD : begin
-            if (TimeOut || HRESP) begin
-                next_state = IDLE;
-            end
-            else if (HREADY) begin
-                next_state = TRANSFER;      // Slave accepted the first address
-            end
-            else begin
-                next_state = LOAD;
-            end
-        end
 
         // If we are in TRANSFER state 
         TRANSFER : begin
@@ -145,55 +131,45 @@ always_comb begin
         //IDLE_STATE
         //////////////////////////////
        IDLE : begin
-        HTRANS = HTRANS_IDLE;
-       end
 
-        ///////////////////////////////
-        //LOAD_STATE
-        ////////////////////////////// 
-        LOAD : begin
-            Load_Counter       = 1'b1;
-            Load_Start_Address = 1'b1;
+            HTRANS = HTRANS_IDLE;
 
-            HTRANS = HTRANS_NONSEQ;
-        end 
+            if (Request && HREADY) begin
+                Load_Counter       = 1'b1;
+                Load_Start_Address = 1'b1;
+            end
+
+        end
 
         ///////////////////////////////
         //TRANSFER_STATE
         //////////////////////////////  
         TRANSFER : begin
 
-            if(TransferDone)begin
-                if(Request)begin
-                    HTRANS = HTRANS_NONSEQ;  // Back-to-back Burst
-                end
-                else begin
-                    HTRANS = HTRANS_IDLE;     // Burst finished, bus is free
-                end
-            end
-            else begin
-                HTRANS = HTRANS_SEQ;          // Continue normally OR wait for slave (HREADY=0)
-            end
-            
-            if(HREADY)begin
+            // HTRANS
+            if (First_Beat)
+                HTRANS = HTRANS_NONSEQ;
+                
+            else
+                HTRANS = HTRANS_SEQ;
+
+
+            if (HREADY) begin
+
                 Decrement_counter = 1'b1;
-                if(TransferDone)begin
-                    if(Request)begin
-                        Load_Counter       = 1'b1;          // Back-to-back Burst
-                        Load_Start_Address = 1'b1;          // Load new start address
+
+                if (TransferDone) begin
+
+                    if (Request) begin
+                        Load_Counter       = 1'b1;
+                        Load_Start_Address = 1'b1;
                     end
+
                 end
                 else begin
                     Increment_Address = 1'b1;
                 end
             end
-        end 
-
-        ///////////////////////////////
-        //BUSY_STATE
-        //////////////////////////////
-        BUSY : begin
-            HTRANS = HTRANS_BUSY;
         end
 
         default: HTRANS = HTRANS_IDLE;           
@@ -202,20 +178,10 @@ end
 
 //signal to enable the registeer to capture the state of HWRITE during the data phase. 
 //This is used to determine if the current transfer is a read or write operation.
-assign Capture_Control_Signal = HREADY && Load_Start_Address;
+assign Address_Accepted = HREADY && (HTRANS == HTRANS_NONSEQ || HTRANS == HTRANS_SEQ);
 
-always_ff @(posedge HCLK or negedge HRESET_n) begin
-    if (!HRESET_n)
-        Data_Phase_Active <= 1'b0;
-    else if (HREADY) begin
-        if (HTRANS == 2'b10 || HTRANS == 2'b11)                      // NONSEQ or SEQ
-            Data_Phase_Active <= 1'b1;                              //  Data Phase
-        else if (HTRANS == 2'b00 || HTRANS == 2'b01)               // IDLE & Busy
-            Data_Phase_Active <= 1'b0;        
-    end
-end
 
 assign CPU_Command_Ready = TransferDone || (current_state == IDLE);
-
     
+
 endmodule

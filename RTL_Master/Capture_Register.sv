@@ -3,7 +3,7 @@ module Capture_Register (
     input logic HRESET_n,
     
     //from FSM
-    input logic Capture_Control_Signal,
+    input logic Address_Accepted,
 
     //CPU control signal
     input logic        CPU_HWRITE,
@@ -24,7 +24,7 @@ always_ff @(posedge HCLK or negedge HRESET_n) begin
             HBURST_Data_Phase <= 3'b0;
         end
         else begin
-            if (Capture_Control_Signal) begin
+            if (Address_Accepted) begin
                 HWRITE_Data_Phase <= CPU_HWRITE;
                 HSIZE_Data_Phase <= CPU_HSIZE;
                 HBURST_Data_Phase <= CPU_HBURST;

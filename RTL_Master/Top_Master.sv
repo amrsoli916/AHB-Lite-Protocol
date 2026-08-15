@@ -43,11 +43,22 @@ module Top_Master #(width = 32)(
 logic Load_Counter, Decrement_counter;
 logic TransferDone;
 logic Load_Start_Address, Increment_Address;
-logic Capture_Control_Signal;
+logic Address_Accepted;
 logic TimeOut;
 logic HWRITE_Data_Phase, Write_Enable;
 logic [31:0] Current_Address, Next_Address;
 logic [2:0] HSIZE_Data_Phase, HBURST_Data_Phase;
+logic First_Beat;
+
+//Write Data Register
+Write_Data_Register Write_Data_Register_Inst(
+    .HCLK(HCLK),
+    .HRESET_n(HRESET_n),
+    .Address_Accepted(Address_Accepted),
+    .CPU_HWRITE(HWRITE_Data_Phase),
+    .CPU_HWDATA(CPU_HWDATA),
+    .HWDATA(HWDATA)              //Data Output For this 
+);
 
 //Burst Counter
 Burst_counter Burst_Counter_Inst(
@@ -57,6 +68,7 @@ Burst_counter Burst_Counter_Inst(
     .Decrement_counter(Decrement_counter),
     .HBURST(CPU_HBURST),
     .HREADY(HREADY),
+    .First_Beat(First_Beat),
     .TransferDone(TransferDone),
     .Last_Transfer(CPU_Last_Transfer)
 );
@@ -76,7 +88,7 @@ Address_Register Address_Register_Inst(
 Capture_Register Capture_Register_Inst(
     .HCLK(HCLK),
     .HRESET_n(HRESET_n),
-    .Capture_Control_Signal(Capture_Control_Signal),
+    .Address_Accepted(Load_Start_Address),
     .CPU_HWRITE(CPU_HWRITE),
     .CPU_HSIZE(CPU_HSIZE),
     .CPU_HBURST(CPU_HBURST),
@@ -99,9 +111,9 @@ FSM FSM_Inst(
     .Load_Counter(Load_Counter),
     .Load_Start_Address(Load_Start_Address),
     .Increment_Address(Increment_Address),
-    .Capture_Control_Signal(Capture_Control_Signal),
+    .Address_Accepted(Address_Accepted),
     .HTRANS(HTRANS),
-    .Data_Phase_Active(Data_Phase_Active),
+    .First_Beat(First_Beat),
     .CPU_Command_Ready(CPU_Command_Ready)              // to tell the CPU i'm Ready to have a new Request
 );
 
@@ -122,29 +134,34 @@ Time_Out Timeout_Generator_Inst(
     .TimeOut(TimeOut)
 );
 
-assign HWRITE = (Load_Start_Address) ? CPU_HWRITE : HWRITE_Data_Phase;   //assign the CPU write signal to the HWRITE output
-assign HADDR = (Load_Start_Address) ? CPU_HADDR : Next_Address;       //assign the current address to the HADDR output
-assign HSIZE  = (Load_Start_Address) ? CPU_HSIZE  : HSIZE_Data_Phase;    //assign the CPU size signal to the HSIZE output
-assign HBURST = (Load_Start_Address) ? CPU_HBURST : HBURST_Data_Phase;   //assign the CPU burst signal to the
+assign HWRITE =  HWRITE_Data_Phase;   //assign the CPU write signal to the HWRITE output
+assign HADDR  = Current_Address;       //assign the current address to the HADDR output
+assign HSIZE  =  HSIZE_Data_Phase;    //assign the CPU size signal to the HSIZE output
+assign HBURST =  HBURST_Data_Phase;   //assign the CPU burst signal to the
 
 
 //enable signal to tell CPU occure error during the transfer
 assign CPU_Error = HRESP && HREADY;                 //assign the HRESP and HREADY signals to the CPU error output
 
+logic Data_Phase_Active;
+
+always_ff @(posedge HCLK or negedge HRESET_n) begin
+    if (!HRESET_n)
+        Data_Phase_Active <= 1'b0;
+    else if (HREADY)
+        Data_Phase_Active <= Address_Accepted; // The Data Phase is exactly 1 cycle after the Address Phase!
+end
         
 //enable signal to tell CPU the data is valid and ready to read
 assign Read_Valid = Data_Phase_Active && HREADY && !HWRITE_Data_Phase 
-            && !HRESP && !TimeOut;    //assign the HREADY and HWRITE data phase signals to the read valid output
+                        && !HRESP && !TimeOut;    //assign the HREADY and HWRITE data phase signals to the read valid output
 
-//write enable signal to tell the AHB that the data is valid and ready to write
-assign Write_Enable = Data_Phase_Active && HWRITE_Data_Phase && !HRESP && !TimeOut;   //assign the data phase active and HWRITE data phase signals to the write enable output
 
-assign CPU_Data_Ready = Data_Phase_Active && HREADY && !TimeOut;
+assign CPU_Data_Ready = Address_Accepted && HREADY && !TimeOut && HWRITE_Data_Phase;
 
-//if we not in write enable put 0 , to consume less power and avoid any glitch in the HWDATA output
-assign HWDATA = (Write_Enable) ? CPU_HWDATA : 'h0;    //assign the CPU HWDATA to the HWDATA output when write enable is high, otherwise assign 0
 
 assign CPU_HRDATA = (Read_Valid) ? HRDATA : 'h0;    //assign the HRDATA to the CPU HHRDATA output when read valid is high, otherwise assign 0
+
 
 
 endmodule
