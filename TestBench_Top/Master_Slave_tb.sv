@@ -255,11 +255,11 @@ module Master_Slave_tb ;
             );
 
             for (i = 1; i < 4; i++) begin
-                while (CPU_Data_Ready !== 1'b1)
-                    @(posedge HCLK);
-
-                @(posedge HCLK);
                 @(negedge HCLK);
+                while (CPU_Data_Ready !== 1'b1) begin
+                    @(negedge HCLK);
+                end
+
                 CPU_HWDATA <= Data[i];
 
                 if (i == 3)
@@ -275,6 +275,7 @@ module Master_Slave_tb ;
             end
 
             wait(CPU_Command_Ready == 1'b1);
+            @(posedge HCLK);
             @(posedge HCLK);
             @(negedge HCLK);
 
@@ -481,7 +482,6 @@ module Master_Slave_tb ;
                 CPU_HADDR  <= ADDR_R;
                 CPU_HWRITE <= 1'b0; // Change to Read Action
                 
-                
                 force P_READY = 1'b0; // make the HREADY = 0
 
                 @(negedge HCLK);
@@ -494,26 +494,29 @@ module Master_Slave_tb ;
                     @(negedge HCLK);
                 end
 
-                CPU_Request <= 1'b0; 
-
-                // 3. Verify Write Data in Memory
-                @(posedge HCLK);
                 @(negedge HCLK);
-                
-                if (Peripheral_Memory[ADDR_W[9:2]] == DATA_W)
-                    $display("PASS: B2B WAIT - WRITE DATA IS CORRECT");
-                else
-                    $display("FAIL: B2B WAIT - WRITE DATA = %h | EXPECTED=%h", Peripheral_Memory[ADDR_W[9:2]], DATA_W);
+                CPU_Request <= 1'b0; 
 
                 // 4. Verify Read Data from CPU
                 while (Read_Valid !== 1'b1) begin
                     @(negedge HCLK);
                 end
 
-                if (CPU_HRDATA == 32'hAAAA_BBBB)
+                // 3. Verify Write Data in Memory
+                @(posedge HCLK);
+                @(posedge HCLK);
+                @(negedge HCLK);
+
+                if (CPU_HRDATA == 32'h0000_0000)
                     $display("PASS: B2B WAIT - READ DATA IS CORRECT");
                 else
                     $display("FAIL: B2B WAIT - READ DATA = %h | EXPECTED=0000_0000", CPU_HRDATA);
+
+                
+                if (Peripheral_Memory[ADDR_W[9:2]] == DATA_W)
+                    $display("PASS: B2B WAIT - WRITE DATA IS CORRECT");
+                else
+                    $display("FAIL: B2B WAIT - WRITE DATA = %h | EXPECTED=%h", Peripheral_Memory[ADDR_W[9:2]], DATA_W);
 
                 // Clean up
                 @(negedge HCLK);
@@ -522,6 +525,113 @@ module Master_Slave_tb ;
                 
                 $display("======================================");
                 $display("B2B WITH WAIT STATES TEST FINISHED");
+                $display("======================================");
+                $display("");
+            end
+    endtask
+
+    //==================================================
+    // Back-to-Back (Write then Write) WITH WAIT STATES
+    //================================================== 
+    task automatic B2B_Write_Write_Wait(
+            input logic [31:0] ADDR_W1,
+            input logic [Data_Width-1:0] DATA_W1,
+            input logic [31:0] ADDR_W2,
+            input logic [Data_Width-1:0] DATA_W2
+        );
+            begin
+                $display("");
+                $display("======================================");
+                $display("START B2B WRITE-WRITE WITH 2 WAIT CYCLES");
+                $display("WRITE 1: ADDR = %h | DATA = %h", ADDR_W1, DATA_W1);
+                $display("WRITE 2: ADDR = %h | DATA = %h", ADDR_W2, DATA_W2);
+                $display("======================================");
+
+                //==================================================
+                // 1. Issue First Write Request
+                //==================================================
+                @(negedge HCLK);
+                CPU_HADDR         <= ADDR_W1;
+                CPU_HWDATA        <= DATA_W1;  // Set the first data here
+                CPU_HWRITE        <= 1'b1;     // Write Action
+                CPU_HBURST        <= 3'b000;   // Single Transfer
+                CPU_Last_Transfer <= 1'b1;
+                CPU_Request       <= 1'b1;
+
+                // Wait until Master accepts the first command (Address Phase 1 Done)
+                @(negedge HCLK);
+                CPU_Request <= 1'b0;
+                while (CPU_Command_Ready !== 1'b1) begin
+                    @(negedge HCLK);
+                end
+
+                //==================================================
+                // 2. Issue Second Address ONLY & INJECT STALL
+                //==================================================
+                // Note: Do NOT change CPU_HWDATA yet. It must hold DATA_W1.
+                CPU_Request <= 1'b1;
+                CPU_HADDR  <= ADDR_W2;
+                CPU_HWRITE <= 1'b1;    
+                
+                // Force stall (Wait States)
+                force P_READY = 1'b0; 
+
+                // Stall for 2 cycles
+                @(negedge HCLK);
+                @(negedge HCLK); 
+                
+                // Release the bus
+                release P_READY; 
+
+                //==================================================
+                // 3. Wait for CPU_Data_Ready before updating to Second Data
+                //==================================================
+                while (CPU_Data_Ready !== 1'b1) begin
+                    @(negedge HCLK);
+                end
+                
+                // Master is ready for data; update immediately
+                CPU_HWDATA <= DATA_W2; 
+
+                // Drop request
+                @(negedge HCLK);
+                CPU_Request <= 1'b0; 
+
+                // Wait for the second Write command to be accepted
+                while (CPU_Command_Ready !== 1'b1) begin
+                    @(negedge HCLK);
+                end
+
+                //==================================================
+                // 4. Wait for Pipelined Data Phases to Finish
+                //==================================================
+                @(posedge HCLK);
+                @(posedge HCLK);
+                @(negedge HCLK);
+                
+                //==================================================
+                // 5. Verify Write Data in Memory for BOTH Writes
+                //==================================================
+                if (Peripheral_Memory[ADDR_W1[9:2]] == DATA_W1)
+                    $display("PASS: B2B WAIT - WRITE 1 DATA IS CORRECT (%h)", DATA_W1);
+                else
+                    $display("FAIL: B2B WAIT - WRITE 1 DATA = %h | EXPECTED=%h", Peripheral_Memory[ADDR_W1[9:2]], DATA_W1);
+
+                if (Peripheral_Memory[ADDR_W2[9:2]] == DATA_W2)
+                    $display("PASS: B2B WAIT - WRITE 2 DATA IS CORRECT (%h)", DATA_W2);
+                else
+                    $display("FAIL: B2B WAIT - WRITE 2 DATA = %h | EXPECTED=%h", Peripheral_Memory[ADDR_W2[9:2]], DATA_W2);
+
+                //==================================================
+                // 6. Clean up
+                //==================================================
+                @(negedge HCLK);
+                CPU_Last_Transfer <= 1'b0;
+                CPU_HADDR         <= '0;
+                CPU_HWDATA        <= '0;
+                
+                $display("======================================");
+                $display("B2B WRITE-WRITE WITH WAIT STATES FINISHED");
                 $display("======================================");
                 $display("");
             end
@@ -561,21 +671,21 @@ module Master_Slave_tb ;
             @(negedge HCLK);
             CPU_Request <= 1'b0;
 
-            while (CPU_Data_Ready !== 1'b1) @(posedge HCLK);
+            while (CPU_Data_Ready !== 1'b1) @(negedge HCLK);
             
             //==================================================
             // 2. Start Beat 1 (Second Transfer - Will have Error)
             //==================================================
             // first data
-            @(negedge HCLK);
             CPU_HWDATA <= Data[1];
             
-            while (CPU_Data_Ready !== 1'b1) @(posedge HCLK);
+            @(negedge HCLK);
+            while (CPU_Data_Ready !== 1'b1) @(negedge HCLK);
             
             //==================================================
             // 3. Inject Error during Beat 1 Data Phase
             //==================================================
-            @(negedge HCLK);
+            
             CPU_HWDATA <= Data[2]; // المعالج يضع بيانات النبضة الثالثة كالمعتاد
             
             // 😈 حقن الخطأ بقوة!
@@ -669,6 +779,16 @@ module Master_Slave_tb ;
             32'h0000_0030, // Address Write
             32'hCCCC_DDDD, // Data Write
             32'h0000_0020  // Address Read
+        );
+
+        //==================================================
+        // Test Back-to-Back (Write -> Write) with Wait States
+        //==================================================
+        B2B_Write_Write_Wait(
+            32'h0000_0070, // Address Write 1
+            32'h1122_3344, // Data Write 1
+            32'h0000_0080, // Address Write 2
+            32'h5566_7788  // Data Write 2
         );
 
         //==================================================

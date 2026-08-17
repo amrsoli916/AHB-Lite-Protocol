@@ -141,27 +141,38 @@ assign HBURST =  HBURST_Data_Phase;   //assign the CPU burst signal to the
 
 
 //enable signal to tell CPU occure error during the transfer
-assign CPU_Error = HRESP && HREADY;                 //assign the HRESP and HREADY signals to the CPU error output
-
-logic Data_Phase_Active;
+                
+always_ff @(posedge HCLK or negedge HRESET_n) begin 
+    if (!HRESET_n) begin
+        CPU_Error <= 1'b0;
+    end
+    else if (HRESP && HREADY) begin
+        CPU_Error <= 1'b1;
+    end  
+end
 
 always_ff @(posedge HCLK or negedge HRESET_n) begin
-    if (!HRESET_n)
-        Data_Phase_Active <= 1'b0;
-    else if (HREADY)
-        Data_Phase_Active <= Address_Accepted; // The Data Phase is exactly 1 cycle after the Address Phase!
+    if (!HRESET_n) begin
+        Read_Valid     <= 1'b0;
+        CPU_Data_Ready <= 1'b0;
+    end
+    else begin
+        // Default values every cycle
+        Read_Valid     <= 1'b0;
+        CPU_Data_Ready <= 1'b0;
+
+        if (HREADY && Address_Accepted && !TimeOut && !HRESP) begin
+
+            if (HWRITE_Data_Phase)
+                CPU_Data_Ready <= 1'b1;
+
+            else
+                Read_Valid <= 1'b1;
+
+        end
+    end
 end
-        
-//enable signal to tell CPU the data is valid and ready to read
-assign Read_Valid = Data_Phase_Active && HREADY && !HWRITE_Data_Phase 
-                        && !HRESP && !TimeOut;    //assign the HREADY and HWRITE data phase signals to the read valid output
-
-
-assign CPU_Data_Ready = Address_Accepted && HREADY && !TimeOut && HWRITE_Data_Phase;
-
 
 assign CPU_HRDATA = (Read_Valid) ? HRDATA : 'h0;    //assign the HRDATA to the CPU HHRDATA output when read valid is high, otherwise assign 0
-
-
 
 endmodule

@@ -84,7 +84,7 @@ end
 //Peripheral Data Bus
 //////////////////////////////
 
-assign P_ENABLE = Data_Phase_Valid && !Error_Complete;
+assign P_ENABLE = Data_Phase_Valid && !Error_Complete ;
 
 assign P_ADDR = HADDR_reg;                          //Transimitte tha Address for Peripheral
 

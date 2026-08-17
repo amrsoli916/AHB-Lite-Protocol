@@ -180,8 +180,17 @@ end
 //This is used to determine if the current transfer is a read or write operation.
 assign Address_Accepted = HREADY && (HTRANS == HTRANS_NONSEQ || HTRANS == HTRANS_SEQ);
 
-
-assign CPU_Command_Ready = TransferDone || (current_state == IDLE);
-    
+always_ff @(posedge HCLK or negedge HRESET_n) begin : blockName
+    if (!HRESET_n) begin
+        CPU_Command_Ready <= 1'b0;
+    end
+    else begin
+        CPU_Command_Ready <= 1'b0;
+        
+        if ((TransferDone && HREADY) || (current_state == IDLE)) begin
+            CPU_Command_Ready <= 1'b1;
+        end
+    end
+end 
 
 endmodule
