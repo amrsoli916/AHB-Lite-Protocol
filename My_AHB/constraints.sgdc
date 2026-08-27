@@ -1,0 +1,5 @@
+current_design Top_AHB
+
+clock -name "HCLK" -period 10 -edge {0 5}
+
+reset -name "HRESET_n" -value 0 -async
