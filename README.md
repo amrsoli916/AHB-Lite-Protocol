@@ -1,233 +1,73 @@
-# 🚀 AMBA AHB-Lite Master Controller
+# AMBA AHB-Lite Master/Slave IP & Pipelined MIPS Integration 🚀
 
-A **parameterized AMBA AHB-Lite Master Controller** implemented in **SystemVerilog**, designed according to the **AMBA 3 AHB-Lite Specification**. The design provides a modular and synthesizable RTL implementation capable of performing single and burst transfers while supporting multiple transfer sizes and burst types.
+![SystemVerilog](https://img.shields.io/badge/Language-SystemVerilog-blue.svg)
+![Protocol](https://img.shields.io/badge/Protocol-AMBA_AHB--Lite-orange.svg)
+![Verification](https://img.shields.io/badge/Verification-Directed_Testing-brightgreen.svg)
+![Status](https://img.shields.io/badge/Status-Verified_&_Linted-success.svg)
 
-The architecture is divided into independent modules, making the design easy to verify, maintain, and extend for FPGA and ASIC development.
-
----
-
-# ✨ Features
-
-- ✅ AMBA 3 AHB-Lite Compatible
-- ✅ Modular RTL Design
-- ✅ FSM-Based Transfer Controller
-- ✅ Address Generator
-- ✅ Burst Counter
-- ✅ Address Register
-- ✅ Read Buffer
-- ✅ Write Buffer
-- ✅ Timeout Detection
-- ✅ CPU Interface
-- ✅ Supports Single & Burst Transfers
-- ✅ Supports Incrementing & Wrapping Bursts
-- ✅ Parameterized Design
-- ✅ Synthesizable RTL
-- ✅ Verified using QuestaSim
+## 📌 Overview
+This repository contains the complete RTL design, verification environment, and SoC integration for an **AMBA 3 AHB-Lite Bus Architecture**, featuring a custom high-performance **AHB Master/Slave IP**, a 5-stage pipelined **MIPS Processor**, and a **UART Subsystem** operating across asynchronous clock domains.
 
 ---
 
-# 🛠️ Supported Burst Types
-
-| Burst Type | Description |
-|------------|-------------|
-| 📦 SINGLE | Single transfer |
-| ➡️ INCR | Undefined length incrementing burst |
-| 🔹 INCR4 | 4-beat incrementing burst |
-| 🔸 INCR8 | 8-beat incrementing burst |
-| 🔶 INCR16 | 16-beat incrementing burst |
-| 🔄 WRAP4 | 4-beat wrapping burst |
-| 🔄 WRAP8 | 8-beat wrapping burst |
-| 🔄 WRAP16 | 16-beat wrapping burst |
+## 🗂️ Repository Structure
+* **`My_AHB/`** $\rightarrow$ Contains all AHB Design components, Master IP, Slave memory models, and standalone verification files.
+* **`Integration_System/`** $\rightarrow$ Houses the top-level SoC integration combining the Pipelined MIPS Processor, AHB bus infrastructure, and UART peripheral working on an independent clock domain.
+* **`photoes/`** $\rightarrow$ Contains architecture diagrams, FSM charts, and verification waveforms.
 
 ---
 
-# 📏 Supported Transfer Sizes
-
-| HSIZE | Transfer Size |
-|--------|---------------|
-| 000 | 8-bit (Byte) |
-| 001 | 16-bit (Halfword) |
-| 010 | 32-bit (Word) |
-| 011 | 64-bit (Doubleword) |
-| 100 | 128-bit |
+## ✨ Key Features & Architecture
+* **Protocol Compliance:** Fully conforms to the AMBA 3 AHB-Lite specification.
+* **Pipelined MIPS Core:** A custom 5-stage pipelined MIPS processor featuring data forwarding, hazard detection unit, and single-precision floating-point support (add.s, sub.s).
+* **Asynchronous Clock Domain Integration:** Integrates peripherals like UART operating on an independent clock domain relative to the main AHB-Lite bus domain.
+* **Zero-Latency Pipelining:** Back-to-Back (B2B) transactions with optimal overlapping of Address and Data phases via a dedicated Data Alignment Register wrapper.
+* **Stall Handling:** Dynamic wait-state injection handling via the `HREADY` signal without data loss.
 
 ---
 
-# 🏗️ Project Components
+## 🏗️ Hardware Architecture & Design
 
-```text
-📂 Project
-│
-├── FSM Controller
-├── Address Generator
-├── Burst Counter
-├── Address Register
-├── Write Buffer
-├── Read Buffer
-├── CPU Interface
-├── Timeout Module
-├── TOP Module
-└── Testbench
-```
+### AHB Master Block Diagram
+<p align="center">
+  <img src="photoes/Master_Architeture.drawio.png" alt="AHB Master Block Diagram" width="700"/>
+</p>
+
+### Master Finite State Machine (FSM)
+<p align="center">
+  <img src="photoes/Master_FSM.drawio.png" alt="FSM Diagram" width="500"/>
+</p>
 
 ---
 
-# 📂 Project Structure
+## 📊 Simulation & Waveforms
 
-```text
-.
-├── rtl
-│   ├── FSM_controller.sv
-│   ├── Address_Generator.sv
-│   ├── Burst_counter.sv
-│   ├── Address_Register.sv
-│   ├── Write_Buffer.sv
-│   ├── Read_Buffer.sv
-│   ├── CPU_Interface.sv
-│   ├── Timeout.sv
-│   └── AHB_Master_TOP.sv
-│
-├── tb
-│   └── AHB_Master_tb.sv
-│
-└── README.md
-```
+### 1. Back-to-Back Transfers with Wait States
+<p align="center">
+  <img src="photoes/Master_WaveForm/backtoback_write&read_with_wait 2 cycle.png" alt="Wait States Waveform" width="800"/>
+</p>
+
+### 2. Burst Error Injection & Recovery
+<p align="center">
+  <img src="photoes/Master_WaveForm/incr4 with error.png" alt="Error Recovery Waveform" width="800"/>
+</p>
+
+### 3. INCR4 Zero-Latency Burst
+<p align="center">
+  <img src="photoes/Master_WaveForm/INCR4_read&write.png" alt="INCR4 Waveform" width="800"/>
+</p>
 
 ---
 
-# 🧠 Architecture
+## 🛠️ EDA Tooling & Sign-off
+* **Simulation:** Verified using industry-standard simulators (Synopsys VCS / Verdi FSDB).
+* **Static Analysis:** Processed through **Synopsys SpyGlass** for rigorous structural Linting and Clock Domain Crossing (CDC) verification.
 
-The AHB-Lite Master is divided into several independent modules.
-
-
-![Architecture](photoes/Master_Architeture.drawio.png)
-
-
----
-
-# ⚙️ FSM Controller
-
-The **Finite State Machine (FSM)** controls the complete AHB-Lite transfer sequence by coordinating transaction initialization, burst execution, address updates, and transfer completion.
-
-### ✨ Features
-
-- 🚀 Starts new AHB transactions
-- 📥 Loads burst counter and start address
-- 🔄 Generates `NONSEQ` and `SEQ`
-- 📍 Controls address progression
-- 🔢 Controls burst counter
-- ⏳ Waits for `HREADY`
-- 🔁 Supports back-to-back transfers
-- ⚠️ Handles timeout and slave error responses
-
-### 📊 FSM State Diagram
-
-> *(Add FSM image here)*
-
-![FSM](photoes/Master_FSM.drawio.png)
+<p align="center">
+  <img src="photoes/Master_WaveForm/spyglass.png" alt="SpyGlass CDC Analysis" width="800"/>
+</p>
 
 ---
 
-# 📍 Address Generator
-
-The Address Generator computes the next transfer address based on the current address, transfer size, and burst type.
-
-### ✨ Features
-
-- 📏 Supports all transfer sizes
-- ➕ Automatic address increment
-- 🔄 WRAP boundary calculation
-- 📦 Supports SINGLE, INCR and WRAP bursts
-- ⚡ Pure combinational logic
-- ✅ Synthesizable RTL
-
-
-# 🔢 Burst Counter
-
-The Burst Counter tracks the remaining beats of each burst transfer.
-
-### ✨ Features
-
-- 📦 Supports SINGLE, INCR, WRAP bursts
-- 🔢 Beat counting
-- ✅ Transfer completion detection
-- ⚡ Simple RTL implementation
-
-
-
-# 🧪 Verification
-
-The design is verified using functional simulation.
-
-### Verified Features
-
-- ✅ Single transfers
-- ✅ Incrementing bursts
-- ✅ Wrapping bursts
-- ✅ Address generation
-- ✅ Burst counting
-- ✅ FSM transitions
-- ✅ HREADY synchronization
-- ✅ Error handling
-
----
-
-
-
-# ⚙️ Simulation
-
-Compile and simulate using **QuestaSim**.
-
-The simulation verifies:
-
-- 📄 FSM transitions
-- 📄 Address generation
-- 📄 Burst counting
-- 📄 Bus transactions
-- 📄 Waveforms
-
----
-
-# 💻 Development Tools
-
-- 🔹 SystemVerilog
-- 🔹 QuestaSim
-- 🔹 Visual Studio Code
-- 🔹 Git & GitHub
-
----
-
-# 📈 Future Improvements
-
-- 🚀 Full AHB Master Verification Environment
-- 🚀 UVM Testbench
-- 🚀 Functional Coverage
-- 🚀 Assertions (SVA)
-- 🚀 DMA Controller Integration
-- 🚀 AHB Arbiter Support
-- 🚀 Multi-Master Support
-- 🚀 AXI Bridge
-
----
-
-# 👨‍💻 Authors
-
-## Amr Soliman
-
-**Communication & Electronics**
-
-Passionate about:
-
-- 💡 Digital Design
-- ⚙️ RTL Design
-- 🧩 ASIC Design
-- 🚀 AMBA Protocols
-- 🖥️ FPGA Design
-- 🔬 Verification
-- 🚀 VLSI Engineering
-
----
-
-# ⭐ Support
-
-If you like this project, give it a ⭐ on GitHub and feel free to contribute!
+## 👨‍💻 Author
+**Amr Soliman** *ASIC/FPGA Design & Verification* [LinkedIn Profile](https://www.linkedin.com/in/amr-soliman19) | [Email](mailto:amrsoliman916@gmail.com)
