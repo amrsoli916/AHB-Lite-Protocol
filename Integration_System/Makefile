@@ -10,7 +10,7 @@ verdi:
 	verdi \
 	-f filelist.f \
 	-dbdir simv.daidir \
-	-ssf CPU_AHB.fsdb \
+	-ssf system.fsdb \
 	-ssr signal.ses &
 
 clean:

@@ -10,7 +10,7 @@ module Time_Out (
     output logic TimeOut
 );
 
-logic [3:0] counter;
+logic [19:0] counter;
 
 always_ff @(posedge HCLK or negedge HRESET_n) begin 
     if (!HRESET_n) begin
@@ -24,5 +24,5 @@ always_ff @(posedge HCLK or negedge HRESET_n) begin
     end
 end 
 
-assign TimeOut = (counter == 4'd15) && !HREADY;
+assign TimeOut = (counter == 20'd1048575) && !HREADY;
 endmodule

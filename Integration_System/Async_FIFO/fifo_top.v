@@ -1,4 +1,4 @@
-module top #(parameter FIFO_WIDTH=8,FIFO_DEPTH=128) (
+module fifo_top #(parameter FIFO_WIDTH=8,FIFO_DEPTH=128) (
     w_clk,r_clk,rst,w_data,w_en,r_data,r_en,full,empty
 );
     parameter ADDRESS_WIDTH=$clog2(FIFO_DEPTH);

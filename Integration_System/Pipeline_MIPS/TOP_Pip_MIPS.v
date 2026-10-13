@@ -5,6 +5,7 @@
 module TOP_Pip_MIPS (
     input  wire       clk,
     input  wire       reset, 
+    input  wire       CPU_Stall,
 
     output wire [31:0] mem_addr,
     output wire [31:0] mem_write_data,
@@ -13,7 +14,6 @@ module TOP_Pip_MIPS (
     output wire        output_size,
 
     input wire  [31:0] mem_read_data,
-    input wire         CPU_Command_Ready,
     input wire         Read_Valid
 );
 
@@ -187,11 +187,9 @@ module TOP_Pip_MIPS (
     wire StallD;
     wire FlushE;
 
-    wire CPU_Stall;
     wire Pipeline_EN;
 
-    assign CPU_Stall = (mem_write_en && !CPU_Command_Ready) || (mem_read_en && !Read_Valid);
-    assign Pipeline_EN = !CPU_Stall;
+    assign Pipeline_EN = !(CPU_Stall);  // Stall the pipeline if CPU is stalled and memory operation is in progress
 
     // ============================================================
     // Instruction Fields
@@ -280,6 +278,10 @@ module TOP_Pip_MIPS (
         .FpuConD     (FpuConD)
     );
 
+    wire wr_en;
+
+    assign wr_en = (MemtoRegW)? Read_Valid : RegWriteW;
+
     Register_File integer_register_file (
         .clk      (clk),
         .rst      (reset),
@@ -287,7 +289,7 @@ module TOP_Pip_MIPS (
         .rd_addr1 (RsD),
         .rd_addr2 (RtD),
 
-        .wr_en3   (RegWriteW),
+        .wr_en3   (wr_en),
         .wr_addr3 (WriteRegW),
         .wr_data3 (ResultW),
 
@@ -568,6 +570,7 @@ module TOP_Pip_MIPS (
     assign MemtoRegM = ControlM[1];
     assign MemWriteM = ControlM[0];
 
+
     // // ============================================================
     // // Memory Stage
     // // ============================================================
@@ -580,13 +583,26 @@ module TOP_Pip_MIPS (
     //     .ReadData  (ReadDataM)
     // );
 
+    reg  [31:0] formated_write_data;
+    wire [7:0]  Target_byte;
+
+    assign Target_byte    = WriteDataM[7:0];
+    always @(*) begin
+        if(MemSizeM == 1'b1)begin   //byte
+            formated_write_data = {Target_byte,Target_byte,Target_byte,Target_byte};
+        end
+        else begin
+            formated_write_data = WriteDataM;
+        end
+    end
+    
     assign mem_addr       = ALUOutM;
-    assign mem_write_data = WriteDataM;
+    assign mem_write_data = formated_write_data;
     assign mem_write_en   = MemWriteM;
     assign mem_read_en    = MemtoRegM;
     assign output_size    = MemSizeM;
 
-    assign ReadDataM      = mem_read_data;
+    assign ReadDataW      = mem_read_data;
     
 
     // ============================================================

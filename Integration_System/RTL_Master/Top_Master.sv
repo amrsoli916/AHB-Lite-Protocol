@@ -35,7 +35,8 @@ module Top_Master #(width = 32)(
     output logic CPU_Error ,                                //if occure error tell CPU                            
     output logic Read_Valid,                                //to tell CPU that the data is valid and ready to read
     output logic CPU_Command_Ready,
-    output logic CPU_Data_Ready,                         //to tell CPU that the next burst request is enabled
+    output logic CPU_Data_Ready, 
+    output logic CPU_Stall,                        
     //output data to CPU
     output logic [width-1:0] CPU_HRDATA
 );
@@ -135,7 +136,7 @@ Time_Out Timeout_Generator_Inst(
 );
 
 assign HWRITE =  HWRITE_Data_Phase;   //assign the CPU write signal to the HWRITE output
-assign HADDR  = Current_Address;       //assign the current address to the HADDR output
+assign HADDR  =  Current_Address;       //assign the current address to the HADDR output
 assign HSIZE  =  HSIZE_Data_Phase;    //assign the CPU size signal to the HSIZE output
 assign HBURST =  HBURST_Data_Phase;   //assign the CPU burst signal to the
 
@@ -151,27 +152,35 @@ always_ff @(posedge HCLK or negedge HRESET_n) begin
     end  
 end
 
-always_ff @(posedge HCLK or negedge HRESET_n) begin
-    if (!HRESET_n) begin
-        Read_Valid     <= 1'b0;
-        CPU_Data_Ready <= 1'b0;
-    end
-    else begin
-        // Default values every cycle
-        Read_Valid     <= 1'b0;
-        CPU_Data_Ready <= 1'b0;
+// logic Data_Phase_Active;
 
-        if (HREADY && Address_Accepted && !TimeOut && !HRESP) begin
+// always_ff @(posedge HCLK or negedge HRESET_n) begin
+//     if (!HRESET_n)
+//         Data_Phase_Active <= 1'b0;
+//     else if (Address_Accepted)
+//         Data_Phase_Active <= 1'b1;
+//     else if (HREADY)
+//         Data_Phase_Active <= 1'b0;
+// end
 
-            if (HWRITE_Data_Phase)
-                CPU_Data_Ready <= 1'b1;
+assign CPU_Data_Ready =
+    Address_Accepted &&
+    HREADY &&
+    HWRITE_Data_Phase &&
+    !HRESP &&
+    !TimeOut;
 
-            else
-                Read_Valid <= 1'b1;
+assign Read_Valid =
+    Address_Accepted &&
+    HREADY &&
+    !HWRITE_Data_Phase &&
+    !HRESP &&
+    !TimeOut;
 
-        end
-    end
-end
+assign CPU_Stall =
+    (((HTRANS == 2'b10) ||
+     (HTRANS == 2'b11))
+    && !HREADY);
 
 assign CPU_HRDATA = HRDATA ;    //assign the HRDATA to the CPU HHRDATA output when read valid is high, otherwise assign 0
 

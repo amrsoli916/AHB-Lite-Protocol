@@ -39,7 +39,7 @@ logic [31:0] MIPS_Raw_Write_Data;
 logic [31:0] CPU_HWDATA;
 logic        CPU_Stall;
 
-assign CPU_Stall = (write && !CPU_Command_Ready) || (read && !Read_Valid);
+
 
 always_ff @(posedge HCLK or negedge HRESET_n) begin 
     if (!HRESET_n) begin
@@ -52,8 +52,8 @@ end
 
 TOP_Pip_MIPS CPU_TOP_Int(                                     //instantation the top od CPU
     .clk(HCLK), .reset(~HRESET_n), .mem_addr(CPU_HADDR), .mem_write_data(MIPS_Raw_Write_Data), 
-    .mem_read_data(CPU_HRDATA), .CPU_Command_Ready(CPU_Command_Ready), .Read_Valid(Read_Valid),
-    .mem_write_en(write), .mem_read_en(read), .output_size(size)
+    .mem_read_data(CPU_HRDATA), .Read_Valid(Read_Valid),
+    .mem_write_en(write), .mem_read_en(read), .output_size(size), .CPU_Stall(CPU_Stall)
 );
 
 assign CPU_HWRITE = write;
@@ -71,7 +71,7 @@ Top_Master Top_Master_int(                                  //instantiation the 
     .CPU_HWDATA(CPU_HWDATA), .CPU_HADDR(CPU_HADDR), .HREADY(HREADY), .HRESP(HRESP), .HRDATA(HRDATA), 
     .HBURST(HBURST), .HSIZE(HSIZE), .HWRITE(HWRITE), .HTRANS(HTRANS), .HADDR(HADDR), .HWDATA(HWDATA),
     .CPU_Error(CPU_Error), .Read_Valid(Read_Valid), .CPU_Command_Ready(CPU_Command_Ready),
-    .CPU_Data_Ready(CPU_Data_Ready), .CPU_HRDATA(CPU_HRDATA)
+    .CPU_Data_Ready(CPU_Data_Ready), .CPU_HRDATA(CPU_HRDATA), .CPU_Stall(CPU_Stall)
 );
 
 endmodule

@@ -134,7 +134,7 @@ always_comb begin
 
             HTRANS = HTRANS_IDLE;
 
-            if (Request && HREADY) begin
+            if (Request) begin
                 Load_Counter       = 1'b1;
                 Load_Start_Address = 1'b1;
             end
